@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shree-harivansh-phc-postgres
+    environment:
+      POSTGRES_DB: phc_inventory
+      POSTGRES_USER: phc_user
+      POSTGRES_PASSWORD: phc_password
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - phc_postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phc_user -d phc_inventory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: shree-harivansh-phc-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      JWT_SECRET: change-this-secret-before-deployment
+      DATABASE_URL: postgres://phc_user:phc_password@postgres:5432/phc_inventory
+      CLIENT_ORIGIN: http://localhost:5173
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:4000
+    container_name: shree-harivansh-phc-ui
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:5173:80"
+
+volumes:
+  phc_postgres_data:
